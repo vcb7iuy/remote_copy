@@ -93,6 +93,7 @@ int main( int argc, char** argv ) {
         strcpy( cmd.option, "PUT" );
       }
       else {
+        fprintf( stderr, "filename: %s, error: %s", argv[2], tp );
         continue;
       }
 
@@ -116,7 +117,7 @@ void usage() {
   fprintf( stderr, "Usege: <プログラム名> <オプション値> <ファイル名>\n");
   fprintf( stderr, "オプション値:\n");
   fprintf( stderr, "-g: file gets from remote\n");
-  fprintf( stderr, "-p: file put to remote\n");
+  fprintf( stderr, "-p: file puts to remote\n");
   fprintf( stderr, "-i: The file to which the command list was written\n");
   exit(1);
 }

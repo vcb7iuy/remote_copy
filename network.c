@@ -41,8 +41,6 @@ int connect_to_server( COMMAND cmd ) {
     return ERROR;
   }
 
-  printf("オプション値 送信成功\n");
-  
   /* ファイル名を送信 */
   len = write( sock, cmd.filename, strlen(cmd.filename) );
   if ( len == -1 ) {    // 送信失敗
@@ -57,8 +55,6 @@ int connect_to_server( COMMAND cmd ) {
     return ERROR;
   }
 
-  printf("ファイル名 送信成功\n");
-  
   /* コマンドを実行 */
   if ( strcmp( cmd.option, "PUT") == 0 ) {    // putを送信したとき
     if ( put_to_remote( sock, cmd.filename ) == ERROR ) {
@@ -140,8 +136,6 @@ void connect_from_client( ) {
         continue;
       }
 
-      printf("オプション値 受信成功\n");
-      
       /* ファイル名を受信 */
       len = read( fd, cmd.filename, BUFFERSIZE - 1 );
       if ( len > 0 ) {    // 受信成功
@@ -159,8 +153,6 @@ void connect_from_client( ) {
         continue;
       }
 
-      printf("ファイル名 受信成功\n");
-      
       /* コマンドを実行 */
       if ( ( strcmp( cmd.option, "GET" ) == 0 ) ) {    // getを受信したとき
         if ( put_to_remote( fd, cmd.filename ) == SUCCESS ) {
@@ -217,7 +209,7 @@ int put_to_remote( int sock, const char* const filename ) {
 
       /* 送信確認 */
       if ( receipt_confirmation( sock, SEND ) == ERROR ) {
-        close(sock);
+        fclose(fp);
         return ERROR;
       }
     }
@@ -237,7 +229,7 @@ int put_to_remote( int sock, const char* const filename ) {
     perror("error: quit len");
     return 1;
   }
-  
+
   return SUCCESS;
 }
 
@@ -254,25 +246,24 @@ int get_from_remote( int sock, const char* const filename ) {
 
   /* データを受信, ファイルに書き込み */
   char str[BUFFERSIZE];
-  int exit_flag;   // 受信終了フラグ
   ssize_t len;     // 受信データバイト数
   size_t wlen;     // 書き込みデータ数
-  do {
+  while ( 1 ) {
     /* 受信処理 */
     len = read( sock, str, sizeof(str) - 1 );
     if ( len > 0 ) {    // 受信成功
       str[len] = '\0';
 
-      exit_flag = strcmp( str, "quit: put_to_remote" );    
+      if ( strcmp( str, "quit: put_to_remote" ) == 0 ) {
+        break;
+      }
 
-      if ( exit_flag ) {
-        /* ファイルに書き込み */
-        wlen = fwrite( str, 1, strlen(str), fp );
-        if ( wlen <= 0 ) {    // 書き込み失敗
-          perror("error: wlen");
+      /* ファイルに書き込み */
+      wlen = fwrite( str, 1, strlen(str), fp );
+      if ( wlen <= 0 ) {    // 書き込み失敗
+        perror("error: wlen");
           fclose(fp);
           return ERROR;
-        }
       }
 
       /* 受信確認 */
@@ -286,7 +277,7 @@ int get_from_remote( int sock, const char* const filename ) {
       fclose(fp);
       return ERROR;
     }
-  } while ( exit_flag );    // 終了文字列を受信するまで
+  }
 
   fclose(fp);    // ファイルを閉じる
   
