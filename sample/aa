@@ -1,2 +1,6 @@
 PUT aaaa
 PUT makefile
+GET Makefile
+GET aaa
+PUT aaaa
+PUT Makefile

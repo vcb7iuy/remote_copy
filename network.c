@@ -18,7 +18,7 @@ int connect_to_server( COMMAND cmd ) {
   memset( &server, 0, sizeof(server) );              // ゼロクリア
   server.sin_family = PF_INET;                       // プロトコル: IPv4
   server.sin_port = htons(50000);                    // ポート番号: 50000
-  server.sin_addr.s_addr = inet_addr("127.0.0.1");   // IPアドレス: 127.0.0.1
+  server.sin_addr.s_addr = inet_addr("192.168.0.128");   // IPアドレス: 127.0.0.1
 
   /* サーバに接続 */
   if ( connect( sock, (const struct sockaddr *)&server, sizeof(server) ) != 0 ) {    // 接続失敗
@@ -35,8 +35,8 @@ int connect_to_server( COMMAND cmd ) {
     return ERROR;
   }
 
-  /* 受信確認 */
-  if ( receipt_confirmation( sock, SEND ) == ERROR ) {
+  /* 返信の受信 */
+  if ( receipt_confirmation( sock, RECV ) == ERROR ) {
     close(sock);
     return ERROR;
   }
@@ -49,8 +49,8 @@ int connect_to_server( COMMAND cmd ) {
     return ERROR;
   }
 
-  /* 受信確認 */
-  if ( receipt_confirmation( sock, SEND ) == ERROR ) {
+  /* 返信の受信 */
+  if ( receipt_confirmation( sock, RECV ) == ERROR ) {
     close(sock);
     return ERROR;
   }
@@ -90,7 +90,7 @@ void connect_from_client( ) {
   memset( &local, 0, sizeof(local) );           // ゼロクリア
   local.sin_family = PF_INET;                   // プロトコル: IPv4
   local.sin_port = htons(50000);                // ポート番号: 50000
-  local.sin_addr.s_addr = htonl(INADDR_ANY);    // IPアドレス: すべてのIPアドレス
+  local.sin_addr.s_addr = htonl(INADDR_ANY);    // IPアドレス: 192.168.0.1
 
   /* バインド処理  */
   if ( bind( sock, (const struct sockaddr *)&local, sizeof(local) ) != 0  ) {     // バインド失敗
@@ -130,8 +130,8 @@ void connect_from_client( ) {
         continue;
       }
 
-      /* 送信確認 */
-      if ( receipt_confirmation( fd, RECV ) == ERROR ) {
+      /* 返信の送信 */
+      if ( receipt_confirmation( fd, SEND ) == ERROR ) {
         close(fd);
         continue;
       }
@@ -147,8 +147,8 @@ void connect_from_client( ) {
         continue;
       }
 
-      /* 送信確認 */
-      if ( receipt_confirmation( fd, RECV ) == ERROR ) {
+      /* 返信の送信 */
+      if ( receipt_confirmation( fd, SEND ) == ERROR ) {
         close(fd);
         continue;
       }
@@ -198,17 +198,17 @@ int put_to_remote( int sock, const char* const filename ) {
     rlen = fread( str, 1, sizeof(str) - 1, fp );
     if ( rlen > 0 ) {    // 読み込み成功
       str[rlen] = '\0';
-
+      
       /* 送信処理 */
       len = write( sock, str, strlen(str) );
       if ( len == -1 ) {    // 送信失敗
         perror("error: len");
-        fclose(fp);
-        return ERROR;
+      fclose(fp);
+      return ERROR;
       }
-
-      /* 送信確認 */
-      if ( receipt_confirmation( sock, SEND ) == ERROR ) {
+      
+      /* 返信の受信 */
+      if ( receipt_confirmation( sock, RECV ) == ERROR ) {
         fclose(fp);
         return ERROR;
       }
@@ -230,6 +230,11 @@ int put_to_remote( int sock, const char* const filename ) {
     return 1;
   }
 
+  /* 返信の受信 */
+  if ( receipt_confirmation( sock, RECV ) == ERROR ) {
+    return ERROR;
+  }
+  
   return SUCCESS;
 }
 
@@ -254,20 +259,26 @@ int get_from_remote( int sock, const char* const filename ) {
     if ( len > 0 ) {    // 受信成功
       str[len] = '\0';
 
+      /* 終了文字を受信 */
       if ( strcmp( str, "quit: put_to_remote" ) == 0 ) {
+        /* 返信の送信 */
+        if ( receipt_confirmation( sock, SEND ) == ERROR ) {
+          fclose(fp);
+          return ERROR;
+        }
         break;
       }
-
+      
       /* ファイルに書き込み */
       wlen = fwrite( str, 1, strlen(str), fp );
       if ( wlen <= 0 ) {    // 書き込み失敗
         perror("error: wlen");
-          fclose(fp);
-          return ERROR;
+        fclose(fp);
+        return ERROR;
       }
-
-      /* 受信確認 */
-      if ( receipt_confirmation( sock, RECV ) == ERROR ) {
+      
+      /* 返信の送信 */
+      if ( receipt_confirmation( sock, SEND ) == ERROR ) {
         fclose(fp);
         return ERROR;
       }
@@ -284,15 +295,19 @@ int get_from_remote( int sock, const char* const filename ) {
   return SUCCESS;
 }
 
-/* 確認文字の送受信 */
+/* 返信文字の送受信 */
 int receipt_confirmation( int sock, int check ) {
   ssize_t len;
-  
-  if ( check == SEND ) {
+
+  if ( check == RECV ) {    // 返信文字の受信
     char str[3];
+
+    /* 受信処理 */
     len = read( sock, str, sizeof(str) - 1 );
     if ( len > 0 ) {    // 受信成功
       str[len] = '\0';
+
+      /* 返信文字の確認 */
       if ( strcmp( str, "OK" ) ) {
         return ERROR;
       }
@@ -302,8 +317,9 @@ int receipt_confirmation( int sock, int check ) {
       return ERROR;
     }
   }
-  else {
+  else {    // 返信文字の送信
     char str[] = "OK";
+
     /* 送信処理 */
     len = write( sock, str, strlen(str) );
     if ( len == -1 ) {    // 送信失敗
