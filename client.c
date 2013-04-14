@@ -46,6 +46,7 @@ int main( int argc, char** argv ) {
 
   if ( strlen(argv[2]) + 1 >= BUFFERSIZE ) {
     fprintf( stderr, "error: filename size\n");
+    exit(1);
   }
   
   /* サーバに接続, コマンドを実行 */
